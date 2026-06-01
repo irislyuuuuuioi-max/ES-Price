@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>涨价节奏监控系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  </head>
+  <body class="bg-slate-50 text-slate-900">
+    <div id="root"></div>
+    <script type="text/babel">
+      const { useEffect, useMemo, useState } = React;
+      const API = "";
+
+      function cx(...parts) {
+        return parts.filter(Boolean).join(" ");
+      }
+
+      async function jsonFetch(url, options) {
+        const res = await fetch(url, options);
+        if (!res.ok) throw new Error(await res.text());
+        return res.json();
+      }
+
+      function App() {
+        const [tab, setTab] = useState("dashboard");
+        const tabs = [
+          ["dashboard", "Dashboard"],
+          ["priceImport", "价格统计表导入"],
+          ["planImport", "涨价计划表导入"],
+          ["checks", "价格检查结果"],
+          ["reminders", "提醒中心"],
+        ];
+        return (
+          <div className="min-h-screen">
+            <header className="border-b bg-white">
+              <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
+                <div>
+                  <h1 className="text-xl font-semibold">涨价节奏监控系统</h1>
+                  <p className="mt-1 text-sm text-slate-500">Excel 导入、阶段目标价检查、执行提醒</p>
+                </div>
+              </div>
+              <nav className="mx-auto flex max-w-7xl gap-1 px-5">
+                {tabs.map(([id, label]) => (
+                  <button
+                    key={id}
+                    onClick={() => setTab(id)}
+                    className={cx(
+                      "border-b-2 px-4 py-3 text-sm font-medium",
+                      tab === id ? "border-emerald-600 text-emerald-700" : "border-transparent text-slate-500 hover:text-slate-800"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </nav>
+            </header>
+            <main className="mx-auto max-w-7xl px-5 py-6">
+              {tab === "dashboard" && <Dashboard />}
+              {tab === "priceImport" && <PriceImport />}
+              {tab === "planImport" && <PlanImport />}
+              {tab === "checks" && <Checks />}
+              {tab === "reminders" && <Reminders />}
+            </main>
+          </div>
+        );
+      }
+
+      function Metric({ label, value }) {
+        return (
+          <div className="rounded border bg-white p-4">
+            <div className="text-2xl font-semibold">{value ?? "-"}</div>
+            <div className="mt-1 text-sm text-slate-500">{label}</div>
+          </div>
+        );
+      }
+
+      function Dashboard() {
+        const [data, setData] = useState(null);
+        useEffect(() => {
+          jsonFetch(`${API}/api/dashboard`).then(setData).catch(console.error);
+        }, []);
+        return (
+          <section>
+            <div className="grid gap-4 md:grid-cols-5">
+              <Metric label="未来 30 天阶段数" value={data?.upcoming_30_days} />
+              <Metric label="未来 15 天阶段数" value={data?.upcoming_15_days} />
+              <Metric label="低于目标价数量" value={data?.below_target_count} />
+              <Metric label="计划缺失 SKU 数" value={data?.plan_missing_sku_count} />
+              <Metric label="平台价缺失数量" value={data?.platform_price_missing_count} />
+            </div>
+          </section>
+        );
+      }
+
+      function PriceImport() {
+        const [file, setFile] = useState(null);
+        const [snapshotDate, setSnapshotDate] = useState("");
+        const [preview, setPreview] = useState(null);
+        const [selected, setSelected] = useState([]);
+        const [message, setMessage] = useState("");
+
+        async function previewFile() {
+          const form = new FormData();
+          form.append("file", file);
+          if (snapshotDate) form.append("snapshot_date", snapshotDate);
+          const data = await jsonFetch(`${API}/api/price-statistics/preview`, { method: "POST", body: form });
+          setPreview(data);
+          setSnapshotDate(data.snapshot_date || snapshotDate);
+          setSelected(data.detected_platform_columns || []);
+        }
+
+        async function importFile() {
+          const form = new FormData();
+          form.append("file", file);
+          form.append("snapshot_date", snapshotDate);
+          form.append("platform_columns", selected.join(","));
+          const data = await jsonFetch(`${API}/api/price-statistics/import`, { method: "POST", body: form });
+          setMessage(`已导入 ${data.imported} 条平台价格记录`);
+        }
+
+        return (
+          <ImportShell
+            title="价格统计表导入"
+            file={file}
+            setFile={setFile}
+            message={message}
+            actions={
+              <>
+                <label className="text-sm">
+                  快照日期
+                  <input type="date" value={snapshotDate} onChange={(e) => setSnapshotDate(e.target.value)} className="ml-2 rounded border px-2 py-1" />
+                </label>
+                <button disabled={!file} onClick={previewFile} className="rounded bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-40">识别预览</button>
+                <button disabled={!file || !snapshotDate || selected.length === 0} onClick={importFile} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white disabled:opacity-40">确认导入</button>
+              </>
+            }
+          >
+            {preview && <ColumnSelector preview={preview} selected={selected} setSelected={setSelected} label="平台价格列" />}
+          </ImportShell>
+        );
+      }
+
+      function PlanImport() {
+        const [file, setFile] = useState(null);
+        const [planYear, setPlanYear] = useState(new Date().getFullYear());
+        const [preview, setPreview] = useState(null);
+        const [selected, setSelected] = useState([]);
+        const [message, setMessage] = useState("");
+
+        async function previewFile() {
+          const form = new FormData();
+          form.append("file", file);
+          form.append("plan_year", planYear);
+          const data = await jsonFetch(`${API}/api/price-plan/preview`, { method: "POST", body: form });
+          setPreview(data);
+          setSelected((data.detected_stage_columns || []).map((x) => x.column));
+        }
+
+        async function importFile() {
+          const form = new FormData();
+          form.append("file", file);
+          form.append("plan_year", planYear);
+          form.append("stage_columns", selected.join(","));
+          const data = await jsonFetch(`${API}/api/price-plan/import`, { method: "POST", body: form });
+          setMessage(`已导入 ${data.imported_items} 个 SKU，${data.imported_stages} 条阶段价格`);
+        }
+
+        return (
+          <ImportShell
+            title="涨价计划表导入"
+            file={file}
+            setFile={setFile}
+            message={message}
+            actions={
+              <>
+                <label className="text-sm">
+                  计划年份
+                  <input type="number" value={planYear} onChange={(e) => setPlanYear(e.target.value)} className="ml-2 w-24 rounded border px-2 py-1" />
+                </label>
+                <button disabled={!file} onClick={previewFile} className="rounded bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-40">解析预览</button>
+                <button disabled={!file || selected.length === 0} onClick={importFile} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white disabled:opacity-40">确认导入</button>
+              </>
+            }
+          >
+            {preview && (
+              <>
+                <ColumnSelector preview={preview} selected={selected} setSelected={setSelected} label="阶段价格列" />
+                <div className="mt-4 overflow-x-auto rounded border bg-white">
+                  <table className="min-w-full text-sm">
+                    <thead className="bg-slate-100">
+                      <tr><th className="px-3 py-2 text-left">阶段列</th><th className="px-3 py-2 text-left">开始日期</th><th className="px-3 py-2 text-left">结束日期</th></tr>
+                    </thead>
+                    <tbody>
+                      {preview.detected_stage_columns.map((x) => (
+                        <tr key={x.column} className="border-t"><td className="px-3 py-2">{x.column}</td><td className="px-3 py-2">{x.start_date || "-"}</td><td className="px-3 py-2">{x.end_date || "-"}</td></tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
+          </ImportShell>
+        );
+      }
+
+      function ImportShell({ title, file, setFile, actions, message, children }) {
+        return (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center gap-3 rounded border bg-white p-4">
+              <h2 className="mr-auto text-lg font-semibold">{title}</h2>
+              <input type="file" accept=".xlsx,.xls" onChange={(e) => setFile(e.target.files[0])} className="text-sm" />
+              {actions}
+            </div>
+            {message && <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
+            {children}
+          </section>
+        );
+      }
+
+      function ColumnSelector({ preview, selected, setSelected, label }) {
+        const selectedSet = useMemo(() => new Set(selected), [selected]);
+        function toggle(col) {
+          setSelected(selectedSet.has(col) ? selected.filter((x) => x !== col) : [...selected, col]);
+        }
+        return (
+          <div className="rounded border bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="font-medium">{label}</div>
+              <div className="text-sm text-slate-500">表头行：第 {preview.header_row} 行，已选 {selected.length} 列</div>
+            </div>
+            <div className="grid gap-2 md:grid-cols-4">
+              {preview.columns.map((col) => (
+                <label key={col} className={cx("flex items-center gap-2 rounded border px-3 py-2 text-sm", selectedSet.has(col) && "border-emerald-500 bg-emerald-50")}>
+                  <input type="checkbox" checked={selectedSet.has(col)} onChange={() => toggle(col)} />
+                  <span className="truncate">{col}</span>
+                </label>
+              ))}
+            </div>
+            <PreviewTable rows={preview.preview_rows} />
+          </div>
+        );
+      }
+
+      function PreviewTable({ rows }) {
+        const cols = rows?.[0] ? Object.keys(rows[0]) : [];
+        return (
+          <div className="mt-4 max-h-80 overflow-auto rounded border">
+            <table className="min-w-full text-xs">
+              <thead className="sticky top-0 bg-slate-100">
+                <tr>{cols.map((c) => <th key={c} className="whitespace-nowrap px-2 py-2 text-left font-medium">{c}</th>)}</tr>
+              </thead>
+              <tbody>
+                {rows.map((r, i) => <tr key={i} className="border-t">{cols.map((c) => <td key={c} className="whitespace-nowrap px-2 py-1">{String(r[c] ?? "")}</td>)}</tr>)}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+
+      function Checks() {
+        const [rows, setRows] = useState([]);
+        const [filters, setFilters] = useState({ sku: "", platform: "", issue: "" });
+        useEffect(() => { jsonFetch(`${API}/api/checks`).then(setRows).catch(console.error); }, []);
+        const data = rows.filter((r) =>
+          (!filters.sku || r.sku?.toLowerCase().includes(filters.sku.toLowerCase())) &&
+          (!filters.platform || r.platform === filters.platform) &&
+          (!filters.issue || r.issue_type === filters.issue)
+        );
+        const platforms = [...new Set(rows.map((r) => r.platform))];
+        const issues = [...new Set(rows.map((r) => r.issue_type))];
+        return (
+          <section className="space-y-4">
+            <div className="flex flex-wrap gap-3 rounded border bg-white p-4">
+              <input placeholder="SKU" value={filters.sku} onChange={(e) => setFilters({ ...filters, sku: e.target.value })} className="rounded border px-3 py-2 text-sm" />
+              <select value={filters.platform} onChange={(e) => setFilters({ ...filters, platform: e.target.value })} className="rounded border px-3 py-2 text-sm">
+                <option value="">全部平台</option>{platforms.map((p) => <option key={p}>{p}</option>)}
+              </select>
+              <select value={filters.issue} onChange={(e) => setFilters({ ...filters, issue: e.target.value })} className="rounded border px-3 py-2 text-sm">
+                <option value="">全部异常类型</option>{issues.map((p) => <option key={p}>{p}</option>)}
+              </select>
+            </div>
+            <DataTable rows={data} columns={[
+              ["sku", "SKU"], ["category_1", "一级类目"], ["category_2", "二级类目"], ["platform", "平台"],
+              ["current_price", "当前价"], ["target_price", "目标价"], ["diff", "差额"], ["current_stage", "当前阶段"],
+              ["issue_type", "问题类型"], ["severity", "严重程度"], ["suggested_action", "建议动作"]
+            ]} />
+          </section>
+        );
+      }
+
+      function Reminders() {
+        const [rows, setRows] = useState([]);
+        useEffect(() => { jsonFetch(`${API}/api/reminders`).then(setRows).catch(console.error); }, []);
+        return <DataTable rows={rows} columns={[
+          ["sku", "SKU"], ["stage_name", "阶段"], ["start_date", "开始日期"], ["end_date", "结束日期"],
+          ["target_price", "目标价"], ["days_until_start", "距离天数"], ["reminder_type", "提醒类型"]
+        ]} />;
+      }
+
+      function DataTable({ rows, columns }) {
+        return (
+          <div className="overflow-auto rounded border bg-white">
+            <table className="min-w-full text-sm">
+              <thead className="bg-slate-100">
+                <tr>{columns.map(([key, label]) => <th key={key} className="whitespace-nowrap px-3 py-2 text-left font-medium">{label}</th>)}</tr>
+              </thead>
+              <tbody>
+                {rows.map((row, idx) => (
+                  <tr key={idx} className="border-t hover:bg-slate-50">
+                    {columns.map(([key]) => <td key={key} className="whitespace-nowrap px-3 py-2">{row[key] ?? "-"}</td>)}
+                  </tr>
+                ))}
+                {rows.length === 0 && <tr><td colSpan={columns.length} className="px-3 py-8 text-center text-slate-500">暂无数据</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
