@@ -94,8 +94,22 @@ def init_db() -> None:
               sort_order integer not null,
               imported_at text not null
             );
+            create table if not exists import_batches (
+              id integer primary key,
+              import_type text not null,
+              filename text,
+              imported_at text not null,
+              row_count integer not null,
+              sku_count integer not null,
+              detail_count integer not null,
+              snapshot_date text,
+              plan_year integer,
+              selected_columns text,
+              note text
+            );
             create index if not exists idx_snapshots_sku_date on price_snapshots(sku, snapshot_date);
             create index if not exists idx_stages_sku_dates on price_plan_stages(sku, start_date, end_date);
+            create index if not exists idx_import_batches_type_time on import_batches(import_type, imported_at);
             """
         )
 
@@ -266,6 +280,55 @@ def rows_to_records(df: pd.DataFrame) -> list[dict[str, Any]]:
     return df.where(pd.notnull(df), None).head(20).to_dict("records")
 
 
+def insert_import_batch(
+    con: sqlite3.Connection,
+    *,
+    import_type: str,
+    filename: str | None,
+    imported_at: str,
+    row_count: int,
+    sku_count: int,
+    detail_count: int,
+    snapshot_date: str | None = None,
+    plan_year: int | None = None,
+    selected_columns: list[str] | None = None,
+    note: str | None = None,
+) -> int:
+    cursor = con.execute(
+        """
+        insert into import_batches
+        (import_type, filename, imported_at, row_count, sku_count, detail_count, snapshot_date, plan_year, selected_columns, note)
+        values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            import_type,
+            filename,
+            imported_at,
+            row_count,
+            sku_count,
+            detail_count,
+            snapshot_date,
+            plan_year,
+            ",".join(selected_columns or []),
+            note,
+        ),
+    )
+    return int(cursor.lastrowid)
+
+
+@app.get("/api/import-history")
+def import_history(import_type: str | None = None) -> list[dict[str, Any]]:
+    query = "select * from import_batches"
+    params: tuple[Any, ...] = ()
+    if import_type:
+        query += " where import_type = ?"
+        params = (import_type,)
+    query += " order by imported_at desc, id desc limit 50"
+    with db() as con:
+        rows = con.execute(query, params).fetchall()
+    return [dict(row) for row in rows]
+
+
 @app.post("/api/price-statistics/preview")
 def preview_price_statistics(file: UploadFile = File(...), snapshot_date: str | None = Form(None)) -> dict[str, Any]:
     path = save_upload(file)
@@ -301,10 +364,12 @@ def import_price_statistics(
     platforms = [p.strip() for p in platform_columns.split(",") if p.strip()]
     imported_at = datetime.now().isoformat(timespec="seconds")
     records = []
+    skus = set()
     for _, row in df.iterrows():
         sku = clean_header(row.get(sku_col))
         if not sku:
             continue
+        skus.add(sku)
         for platform in platforms:
             price, status = parse_price(row.get(platform))
             records.append(
@@ -329,7 +394,18 @@ def import_price_statistics(
             """,
             records,
         )
-    return {"imported": len(records)}
+        batch_id = insert_import_batch(
+            con,
+            import_type="price_statistics",
+            filename=file.filename,
+            imported_at=imported_at,
+            row_count=len(df),
+            sku_count=len(skus),
+            detail_count=len(records),
+            snapshot_date=snapshot_date,
+            selected_columns=platforms,
+        )
+    return {"batch_id": batch_id, "imported": len(records)}
 
 
 @app.post("/api/price-plan/preview")
@@ -376,10 +452,12 @@ def import_price_plan(
     imported_at = datetime.now().isoformat(timespec="seconds")
     items = []
     stages = []
+    skus = set()
     for _, row in df.iterrows():
         sku = clean_header(row.get(sku_col))
         if not sku:
             continue
+        skus.add(sku)
         base_price, _ = parse_price(row.get(base_col)) if base_col else (None, "MISSING")
         new_price, _ = parse_price(row.get(new_col)) if new_col else (None, "MISSING")
         diff, _ = parse_price(row.get(diff_col)) if diff_col else (None, "MISSING")
@@ -411,7 +489,18 @@ def import_price_plan(
             """,
             stages,
         )
-    return {"imported_items": len(items), "imported_stages": len(stages)}
+        batch_id = insert_import_batch(
+            con,
+            import_type="price_plan",
+            filename=file.filename,
+            imported_at=imported_at,
+            row_count=len(df),
+            sku_count=len(skus),
+            detail_count=len(stages),
+            plan_year=plan_year,
+            selected_columns=stage_cols,
+        )
+    return {"batch_id": batch_id, "imported_items": len(items), "imported_stages": len(stages)}
 
 
 def get_latest_snapshot_date(con: sqlite3.Connection) -> str | None:

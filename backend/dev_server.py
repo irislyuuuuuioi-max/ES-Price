@@ -55,6 +55,7 @@ from backend.app.main import (  # noqa: E402
     dashboard,
     import_price_plan,
     import_price_statistics,
+    import_history,
     preview_price_plan,
     preview_price_statistics,
     reminders,
@@ -105,6 +106,9 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(checks(params.get("issue_type", [None])[0], params.get("sku", [None])[0], params.get("platform", [None])[0]))
             if parsed.path == "/api/reminders":
                 return self.send_json(reminders())
+            if parsed.path == "/api/import-history":
+                params = parse_qs(parsed.query)
+                return self.send_json(import_history(params.get("import_type", [None])[0]))
             if parsed.path in {"/", "/index.html"}:
                 return self.send_file(ROOT / "frontend" / "index.html", "text/html; charset=utf-8")
             target = (ROOT / "frontend" / parsed.path.lstrip("/")).resolve()

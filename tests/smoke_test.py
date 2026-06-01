@@ -27,7 +27,9 @@ def run():
     assert preview["snapshot_date"] == "2026-06-26"
     assert "OS-ES" in preview["detected_platform_columns"]
     price.seek(0)
-    assert main.import_price_statistics(_UploadFile("price.xlsx", price), preview["snapshot_date"], "OS-ES,HD-GJ")["imported"] == 4
+    price_import = main.import_price_statistics(_UploadFile("price.xlsx", price), preview["snapshot_date"], "OS-ES,HD-GJ")
+    assert price_import["imported"] == 4
+    assert price_import["batch_id"] > 0
 
     plan = io.BytesIO()
     pd.DataFrame(
@@ -51,6 +53,9 @@ def run():
     )
     assert imported["imported_items"] == 2
     assert imported["imported_stages"] == 6
+    assert imported["batch_id"] > 0
+    assert main.import_history("price_statistics")[0]["detail_count"] == 4
+    assert main.import_history("price_plan")[0]["detail_count"] == 6
     assert isinstance(main.dashboard(), dict)
     assert len(main.checks()) >= 4
     print("smoke ok")

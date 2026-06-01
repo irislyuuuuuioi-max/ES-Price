@@ -102,6 +102,16 @@
         const [preview, setPreview] = useState(null);
         const [selected, setSelected] = useState([]);
         const [message, setMessage] = useState("");
+        const [history, setHistory] = useState([]);
+
+        async function loadHistory() {
+          const data = await jsonFetch(`${API}/api/import-history?import_type=price_statistics`);
+          setHistory(data);
+        }
+
+        useEffect(() => {
+          loadHistory().catch(console.error);
+        }, []);
 
         async function previewFile() {
           const form = new FormData();
@@ -120,6 +130,7 @@
           form.append("platform_columns", selected.join(","));
           const data = await jsonFetch(`${API}/api/price-statistics/import`, { method: "POST", body: form });
           setMessage(`已导入 ${data.imported} 条平台价格记录`);
+          await loadHistory();
         }
 
         return (
@@ -140,6 +151,7 @@
             }
           >
             {preview && <ColumnSelector preview={preview} selected={selected} setSelected={setSelected} label="平台价格列" />}
+            <ImportHistory rows={history} typeLabel="价格统计表" />
           </ImportShell>
         );
       }
@@ -150,6 +162,16 @@
         const [preview, setPreview] = useState(null);
         const [selected, setSelected] = useState([]);
         const [message, setMessage] = useState("");
+        const [history, setHistory] = useState([]);
+
+        async function loadHistory() {
+          const data = await jsonFetch(`${API}/api/import-history?import_type=price_plan`);
+          setHistory(data);
+        }
+
+        useEffect(() => {
+          loadHistory().catch(console.error);
+        }, []);
 
         async function previewFile() {
           const form = new FormData();
@@ -167,6 +189,7 @@
           form.append("stage_columns", selected.join(","));
           const data = await jsonFetch(`${API}/api/price-plan/import`, { method: "POST", body: form });
           setMessage(`已导入 ${data.imported_items} 个 SKU，${data.imported_stages} 条阶段价格`);
+          await loadHistory();
         }
 
         return (
@@ -203,6 +226,7 @@
                 </div>
               </>
             )}
+            <ImportHistory rows={history} typeLabel="涨价计划表" />
           </ImportShell>
         );
       }
@@ -241,6 +265,44 @@
               ))}
             </div>
             <PreviewTable rows={preview.preview_rows} />
+          </div>
+        );
+      }
+
+      function ImportHistory({ rows, typeLabel }) {
+        return (
+          <div className="rounded border bg-white p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="font-medium">{typeLabel}导入历史</div>
+              <div className="text-sm text-slate-500">最近 {rows.length} 次导入</div>
+            </div>
+            <div className="overflow-auto rounded border">
+              <table className="min-w-full text-sm">
+                <thead className="bg-slate-100">
+                  <tr>
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">导入时间</th>
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">文件名</th>
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">SKU 数</th>
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">明细数</th>
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">快照/年份</th>
+                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">已确认列</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row) => (
+                    <tr key={row.id} className="border-t hover:bg-slate-50">
+                      <td className="whitespace-nowrap px-3 py-2">{row.imported_at}</td>
+                      <td className="whitespace-nowrap px-3 py-2">{row.filename || "-"}</td>
+                      <td className="whitespace-nowrap px-3 py-2">{row.sku_count}</td>
+                      <td className="whitespace-nowrap px-3 py-2">{row.detail_count}</td>
+                      <td className="whitespace-nowrap px-3 py-2">{row.snapshot_date || row.plan_year || "-"}</td>
+                      <td className="max-w-xl truncate px-3 py-2" title={row.selected_columns || ""}>{row.selected_columns || "-"}</td>
+                    </tr>
+                  ))}
+                  {rows.length === 0 && <tr><td colSpan="6" className="px-3 py-8 text-center text-slate-500">暂无导入历史</td></tr>}
+                </tbody>
+              </table>
+            </div>
           </div>
         );
       }
