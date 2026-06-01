@@ -1,5 +1,6 @@
 import io
 import sys
+import tempfile
 from pathlib import Path
 
 import pandas as pd
@@ -11,6 +12,8 @@ from backend.app import main
 
 
 def run():
+    temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+    main.DB_PATH = Path(temp_dir.name) / "price_monitor.sqlite3"
     main.startup()
     price = io.BytesIO()
     pd.DataFrame(
@@ -26,6 +29,8 @@ def run():
     assert preview["header_row"] == 2
     assert preview["snapshot_date"] == "2026-06-26"
     assert "OS-ES" in preview["detected_platform_columns"]
+    assert "SKU" not in preview["detected_platform_columns"]
+    assert "一级类目" not in preview["detected_platform_columns"]
     price.seek(0)
     price_import = main.import_price_statistics(_UploadFile("price.xlsx", price), preview["snapshot_date"], "OS-ES,HD-GJ")
     assert price_import["imported"] == 4
@@ -45,6 +50,7 @@ def run():
     assert plan_preview["header_row"] == 2
     assert plan_preview["detected_stage_columns"][1]["start_date"] == "2026-08-06"
     assert plan_preview["detected_stage_columns"][1]["end_date"] == "2026-10-04"
+    assert all(stage["column"] != "SKU" for stage in plan_preview["detected_stage_columns"])
     plan.seek(0)
     imported = main.import_price_plan(
         _UploadFile("plan.xlsx", plan),
@@ -58,6 +64,7 @@ def run():
     assert main.import_history("price_plan")[0]["detail_count"] == 6
     assert isinstance(main.dashboard(), dict)
     assert len(main.checks()) >= 4
+    temp_dir.cleanup()
     print("smoke ok")
 
 

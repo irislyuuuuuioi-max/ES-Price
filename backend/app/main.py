@@ -35,6 +35,7 @@ NON_PLATFORM_HEADERS = (
     | FINAL_EXEC_ALIASES
     | {"新旧差价", "差价", "备注", "图片", "链接", "asin", "spu"}
 )
+NON_PLATFORM_HEADER_KEYS = {header.lower().replace(" ", "") for header in NON_PLATFORM_HEADERS}
 
 
 app = FastAPI(title="涨价节奏监控系统")
@@ -112,6 +113,15 @@ def init_db() -> None:
             create index if not exists idx_import_batches_type_time on import_batches(import_type, imported_at);
             """
         )
+        ensure_column(con, "price_snapshots", "batch_id", "integer")
+        ensure_column(con, "price_plan_items", "batch_id", "integer")
+        ensure_column(con, "price_plan_stages", "batch_id", "integer")
+
+
+def ensure_column(con: sqlite3.Connection, table: str, column: str, column_type: str) -> None:
+    columns = {row["name"] for row in con.execute(f"pragma table_info({table})").fetchall()}
+    if column not in columns:
+        con.execute(f"alter table {table} add column {column} {column_type}")
 
 
 @app.on_event("startup")
@@ -223,7 +233,7 @@ def detect_price_columns(columns: list[str]) -> list[str]:
     result = []
     for col in columns:
         n = normalized(col)
-        if not n or n in NON_PLATFORM_HEADERS:
+        if not n or n in NON_PLATFORM_HEADER_KEYS:
             continue
         if "price" in n or "价格" in n or "-" in col or re.search(r"[A-Z]{2,}", col):
             result.append(col)
@@ -234,7 +244,7 @@ def detect_stage_columns(columns: list[str]) -> list[str]:
     result = []
     for col in columns:
         n = normalized(col)
-        if not n or n in NON_PLATFORM_HEADERS:
+        if not n or n in NON_PLATFORM_HEADER_KEYS:
             continue
         if re.search(r"\d{1,2}[./]\d{1,2}|后价格|phase|red white blue", col, re.I):
             result.append(col)
@@ -361,7 +371,11 @@ def import_price_statistics(
         raise HTTPException(400, "缺少 SKU 列")
     c1 = find_column(columns, CATEGORY_1_ALIASES)
     c2 = find_column(columns, CATEGORY_2_ALIASES)
-    platforms = [p.strip() for p in platform_columns.split(",") if p.strip()]
+    platforms = [
+        p.strip()
+        for p in platform_columns.split(",")
+        if p.strip() in columns and normalized(p.strip()) not in NON_PLATFORM_HEADER_KEYS
+    ]
     imported_at = datetime.now().isoformat(timespec="seconds")
     records = []
     skus = set()
@@ -386,14 +400,6 @@ def import_price_statistics(
                 )
             )
     with db() as con:
-        con.executemany(
-            """
-            insert into price_snapshots
-            (sku, category_1, category_2, snapshot_date, platform, current_price, raw_value, price_status, imported_at)
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            records,
-        )
         batch_id = insert_import_batch(
             con,
             import_type="price_statistics",
@@ -404,6 +410,15 @@ def import_price_statistics(
             detail_count=len(records),
             snapshot_date=snapshot_date,
             selected_columns=platforms,
+        )
+        records = [record + (batch_id,) for record in records]
+        con.executemany(
+            """
+            insert into price_snapshots
+            (sku, category_1, category_2, snapshot_date, platform, current_price, raw_value, price_status, imported_at, batch_id)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            records,
         )
     return {"batch_id": batch_id, "imported": len(records)}
 
@@ -441,7 +456,11 @@ def import_price_plan(
     new_col = find_column(columns, NEW_PRICE_ALIASES)
     final_col = find_column(columns, FINAL_EXEC_ALIASES)
     diff_col = next((c for c in columns if normalized(c) in {"新旧差价", "差价"}), None)
-    stage_cols = [p.strip() for p in stage_columns.split(",") if p.strip()]
+    stage_cols = [
+        p.strip()
+        for p in stage_columns.split(",")
+        if p.strip() in columns and normalized(p.strip()) not in NON_PLATFORM_HEADER_KEYS
+    ]
     parsed_stages = []
     for idx, col in enumerate(stage_cols):
         start, end = parse_stage_dates(col, plan_year)
@@ -467,28 +486,6 @@ def import_price_plan(
             price, status = parse_price(row.get(stage["column"]))
             stages.append((sku, stage["column"], stage["start"], stage["end"], price, clean_header(row.get(stage["column"])), status, stage["sort"], imported_at))
     with db() as con:
-        con.executemany(
-            """
-            insert into price_plan_items
-            (sku, category_1, category_2, base_price, new_reference_price, price_diff, final_effective_date, final_effective_note, plan_year, imported_at)
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            on conflict(sku) do update set
-              category_1=excluded.category_1, category_2=excluded.category_2,
-              base_price=excluded.base_price, new_reference_price=excluded.new_reference_price,
-              price_diff=excluded.price_diff, final_effective_date=excluded.final_effective_date,
-              final_effective_note=excluded.final_effective_note, plan_year=excluded.plan_year,
-              imported_at=excluded.imported_at
-            """,
-            items,
-        )
-        con.executemany(
-            """
-            insert into price_plan_stages
-            (sku, stage_name, start_date, end_date, target_price, raw_value, price_status, sort_order, imported_at)
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            stages,
-        )
         batch_id = insert_import_batch(
             con,
             import_type="price_plan",
@@ -500,10 +497,46 @@ def import_price_plan(
             plan_year=plan_year,
             selected_columns=stage_cols,
         )
+        items = [item + (batch_id,) for item in items]
+        stages = [stage + (batch_id,) for stage in stages]
+        con.executemany(
+            """
+            insert into price_plan_items
+            (sku, category_1, category_2, base_price, new_reference_price, price_diff, final_effective_date, final_effective_note, plan_year, imported_at, batch_id)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            on conflict(sku) do update set
+              category_1=excluded.category_1, category_2=excluded.category_2,
+              base_price=excluded.base_price, new_reference_price=excluded.new_reference_price,
+              price_diff=excluded.price_diff, final_effective_date=excluded.final_effective_date,
+              final_effective_note=excluded.final_effective_note, plan_year=excluded.plan_year,
+              imported_at=excluded.imported_at, batch_id=excluded.batch_id
+            """,
+            items,
+        )
+        con.executemany(
+            """
+            insert into price_plan_stages
+            (sku, stage_name, start_date, end_date, target_price, raw_value, price_status, sort_order, imported_at, batch_id)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            stages,
+        )
     return {"batch_id": batch_id, "imported_items": len(items), "imported_stages": len(stages)}
 
 
 def get_latest_snapshot_date(con: sqlite3.Connection) -> str | None:
+    row = con.execute(
+        """
+        select snapshot_date as d
+        from price_snapshots
+        where batch_id = (
+          select id from import_batches where import_type = 'price_statistics' order by imported_at desc, id desc limit 1
+        )
+        limit 1
+        """
+    ).fetchone()
+    if row and row["d"]:
+        return row["d"]
     row = con.execute("select max(snapshot_date) as d from price_snapshots").fetchone()
     return row["d"] if row else None
 
@@ -511,17 +544,27 @@ def get_latest_snapshot_date(con: sqlite3.Connection) -> str | None:
 def load_checks(as_of: str | None = None) -> list[dict[str, Any]]:
     with db() as con:
         snapshot_date = as_of or get_latest_snapshot_date(con) or date.today().isoformat()
+        latest_price_batch = con.execute("select id from import_batches where import_type = 'price_statistics' order by imported_at desc, id desc limit 1").fetchone()
+        latest_plan_batch = con.execute("select id from import_batches where import_type = 'price_plan' order by imported_at desc, id desc limit 1").fetchone()
+        price_batch_id = latest_price_batch["id"] if latest_price_batch and not as_of else None
+        plan_batch_id = latest_plan_batch["id"] if latest_plan_batch else None
+        price_filter = "s.batch_id = ?" if price_batch_id is not None else "s.snapshot_date = ?"
+        price_param = price_batch_id if price_batch_id is not None else snapshot_date
         rows = con.execute(
-            """
+            f"""
             select s.*, i.base_price, i.new_reference_price
             from price_snapshots s
             left join price_plan_items i on i.sku = s.sku
-            where s.snapshot_date = ?
+            where {price_filter}
             """,
-            (snapshot_date,),
+            (price_param,),
         ).fetchall()
         stages_by_sku: dict[str, list[sqlite3.Row]] = {}
-        for st in con.execute("select * from price_plan_stages order by sku, sort_order").fetchall():
+        if plan_batch_id:
+            stage_rows = con.execute("select * from price_plan_stages where batch_id = ? order by sku, sort_order", (plan_batch_id,)).fetchall()
+        else:
+            stage_rows = con.execute("select * from price_plan_stages order by sku, sort_order").fetchall()
+        for st in stage_rows:
             stages_by_sku.setdefault(st["sku"], []).append(st)
     checks = []
     day = date.fromisoformat(snapshot_date)
