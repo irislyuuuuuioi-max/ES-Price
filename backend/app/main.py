@@ -108,6 +108,11 @@ def init_db() -> None:
               selected_columns text,
               note text
             );
+            create table if not exists reminder_statuses (
+              reminder_key text primary key,
+              status text not null,
+              updated_at text not null
+            );
             create index if not exists idx_snapshots_sku_date on price_snapshots(sku, snapshot_date);
             create index if not exists idx_stages_sku_dates on price_plan_stages(sku, start_date, end_date);
             create index if not exists idx_import_batches_type_time on import_batches(import_type, imported_at);
@@ -339,6 +344,13 @@ def import_history(import_type: str | None = None) -> list[dict[str, Any]]:
     return [dict(row) for row in rows]
 
 
+def latest_batch(con: sqlite3.Connection, import_type: str) -> sqlite3.Row | None:
+    return con.execute(
+        "select * from import_batches where import_type = ? order by imported_at desc, id desc limit 1",
+        (import_type,),
+    ).fetchone()
+
+
 @app.post("/api/price-statistics/preview")
 def preview_price_statistics(file: UploadFile = File(...), snapshot_date: str | None = Form(None)) -> dict[str, Any]:
     path = save_upload(file)
@@ -541,18 +553,23 @@ def get_latest_snapshot_date(con: sqlite3.Connection) -> str | None:
     return row["d"] if row else None
 
 
-def load_checks(as_of: str | None = None) -> list[dict[str, Any]]:
+def load_checks(audit_date: str | None = None, snapshot_batch_id: int | None = None, plan_batch_id: int | None = None) -> list[dict[str, Any]]:
     with db() as con:
-        snapshot_date = as_of or get_latest_snapshot_date(con) or date.today().isoformat()
-        latest_price_batch = con.execute("select id from import_batches where import_type = 'price_statistics' order by imported_at desc, id desc limit 1").fetchone()
-        latest_plan_batch = con.execute("select id from import_batches where import_type = 'price_plan' order by imported_at desc, id desc limit 1").fetchone()
-        price_batch_id = latest_price_batch["id"] if latest_price_batch and not as_of else None
-        plan_batch_id = latest_plan_batch["id"] if latest_plan_batch else None
+        latest_price_batch = latest_batch(con, "price_statistics")
+        latest_plan_batch = latest_batch(con, "price_plan")
+        price_batch_id = snapshot_batch_id or (latest_price_batch["id"] if latest_price_batch else None)
+        active_plan_batch_id = plan_batch_id or (latest_plan_batch["id"] if latest_plan_batch else None)
+        snapshot_date = get_latest_snapshot_date(con) or date.today().isoformat()
+        if price_batch_id:
+            row = con.execute("select snapshot_date from price_snapshots where batch_id = ? limit 1", (price_batch_id,)).fetchone()
+            if row and row["snapshot_date"]:
+                snapshot_date = row["snapshot_date"]
+        check_date = audit_date or date.today().isoformat()
         price_filter = "s.batch_id = ?" if price_batch_id is not None else "s.snapshot_date = ?"
         price_param = price_batch_id if price_batch_id is not None else snapshot_date
         rows = con.execute(
             f"""
-            select s.*, i.base_price, i.new_reference_price
+            select s.*, i.base_price, i.new_reference_price, i.final_effective_date, i.final_effective_note
             from price_snapshots s
             left join price_plan_items i on i.sku = s.sku
             where {price_filter}
@@ -560,14 +577,19 @@ def load_checks(as_of: str | None = None) -> list[dict[str, Any]]:
             (price_param,),
         ).fetchall()
         stages_by_sku: dict[str, list[sqlite3.Row]] = {}
-        if plan_batch_id:
-            stage_rows = con.execute("select * from price_plan_stages where batch_id = ? order by sku, sort_order", (plan_batch_id,)).fetchall()
+        if active_plan_batch_id:
+            stage_rows = con.execute("select * from price_plan_stages where batch_id = ? order by sku, sort_order", (active_plan_batch_id,)).fetchall()
         else:
             stage_rows = con.execute("select * from price_plan_stages order by sku, sort_order").fetchall()
         for st in stage_rows:
             stages_by_sku.setdefault(st["sku"], []).append(st)
+        snapshot_skus = {row["sku"] for row in rows}
+        plan_items = con.execute(
+            "select * from price_plan_items where batch_id = ?" if active_plan_batch_id else "select * from price_plan_items",
+            (active_plan_batch_id,) if active_plan_batch_id else (),
+        ).fetchall()
     checks = []
-    day = date.fromisoformat(snapshot_date)
+    day = date.fromisoformat(check_date)
     for row in rows:
         stages = stages_by_sku.get(row["sku"], [])
         current_stage = None
@@ -591,13 +613,22 @@ def load_checks(as_of: str | None = None) -> list[dict[str, Any]]:
             stage_name = latest["stage_name"]
         if row["price_status"] == "MISSING":
             issue = "PLATFORM_PRICE_MISSING"
+        elif row["price_status"] == "NOT_APPLICABLE":
+            issue = "PLATFORM_NOT_APPLICABLE"
         elif row["price_status"] == "PARSE_ERROR":
             issue = "PRICE_PARSE_ERROR"
         elif issue == "NORMAL" and target is not None and row["current_price"] is not None and row["current_price"] < target - 0.01:
-            issue = "BELOW_STAGE_TARGET" if current_stage else "BELOW_BASE_PRICE"
+            if row["final_effective_date"] and date.fromisoformat(row["final_effective_date"]) <= day:
+                issue = "NOT_UPDATED_AFTER_EFFECTIVE_DATE"
+            else:
+                issue = "BELOW_STAGE_TARGET" if current_stage else "BELOW_BASE_PRICE"
         diff = None if target is None or row["current_price"] is None else round(row["current_price"] - target, 2)
         checks.append(
             {
+                "snapshot_batch_id": row["batch_id"],
+                "plan_batch_id": active_plan_batch_id,
+                "audit_date": check_date,
+                "snapshot_date": snapshot_date,
                 "sku": row["sku"],
                 "category_1": row["category_1"],
                 "category_2": row["category_2"],
@@ -607,16 +638,71 @@ def load_checks(as_of: str | None = None) -> list[dict[str, Any]]:
                 "diff": diff,
                 "current_stage": stage_name,
                 "issue_type": issue,
-                "severity": "HIGH" if issue in {"BELOW_STAGE_TARGET", "NOT_UPDATED_AFTER_EFFECTIVE_DATE"} else ("MEDIUM" if issue != "NORMAL" else "LOW"),
-                "suggested_action": "立即核查并调整平台价" if issue.startswith("BELOW") else ("补充价格或计划数据" if issue != "NORMAL" else "无需处理"),
+                "severity": severity_for_issue(issue),
+                "suggested_action": suggestion_for_issue(issue, row["platform"], target),
+            }
+        )
+    for item in plan_items:
+        if item["sku"] in snapshot_skus:
+            continue
+        checks.append(
+            {
+                "snapshot_batch_id": price_batch_id,
+                "plan_batch_id": active_plan_batch_id,
+                "audit_date": check_date,
+                "snapshot_date": snapshot_date,
+                "sku": item["sku"],
+                "category_1": item["category_1"],
+                "category_2": item["category_2"],
+                "platform": None,
+                "current_price": None,
+                "target_price": item["base_price"],
+                "diff": None,
+                "current_stage": "价格统计表缺失",
+                "issue_type": "SNAPSHOT_SKU_MISSING",
+                "severity": "MEDIUM",
+                "suggested_action": "补充该 SKU 的价格统计数据",
             }
         )
     return checks
 
 
+def severity_for_issue(issue: str) -> str:
+    if issue in {"BELOW_STAGE_TARGET", "NOT_UPDATED_AFTER_EFFECTIVE_DATE", "PRICE_PARSE_ERROR"}:
+        return "HIGH"
+    if issue in {"BELOW_BASE_PRICE", "PLATFORM_PRICE_MISSING", "PLAN_MISSING", "SNAPSHOT_SKU_MISSING"}:
+        return "MEDIUM"
+    if issue == "PLATFORM_NOT_APPLICABLE":
+        return "LOW"
+    return "NORMAL"
+
+
+def suggestion_for_issue(issue: str, platform: str | None, target: float | None) -> str:
+    if issue in {"BELOW_BASE_PRICE", "BELOW_STAGE_TARGET", "NOT_UPDATED_AFTER_EFFECTIVE_DATE"}:
+        return f"核查 {platform or '平台'} 并调整至 {target:.2f} 以上" if target is not None else "核查并调整平台价"
+    if issue == "PLATFORM_PRICE_MISSING":
+        return f"补充 {platform or '平台'} 价格数据"
+    if issue == "PLATFORM_NOT_APPLICABLE":
+        return "平台不适用，确认无需监控"
+    if issue == "PLAN_MISSING":
+        return "补充涨价计划"
+    if issue == "SNAPSHOT_SKU_MISSING":
+        return "补充价格统计表 SKU"
+    if issue == "PRICE_PARSE_ERROR":
+        return "修正无法解析的价格字段"
+    return "无需处理"
+
+
 @app.get("/api/checks")
-def checks(issue_type: str | None = None, sku: str | None = None, platform: str | None = None) -> list[dict[str, Any]]:
-    data = load_checks()
+def checks(
+    issue_type: str | None = None,
+    sku: str | None = None,
+    platform: str | None = None,
+    audit_date: str | None = None,
+    snapshot_batch_id: int | None = None,
+    plan_batch_id: int | None = None,
+) -> list[dict[str, Any]]:
+    data = load_checks(audit_date=audit_date, snapshot_batch_id=snapshot_batch_id, plan_batch_id=plan_batch_id)
     if issue_type:
         data = [x for x in data if x["issue_type"] == issue_type]
     if sku:
@@ -627,44 +713,98 @@ def checks(issue_type: str | None = None, sku: str | None = None, platform: str 
 
 
 @app.get("/api/dashboard")
-def dashboard() -> dict[str, int]:
-    today = date.today()
-    checks_data = load_checks()
+def dashboard(audit_date: str | None = None) -> dict[str, Any]:
+    today = date.fromisoformat(audit_date) if audit_date else date.today()
+    checks_data = load_checks(audit_date=today.isoformat())
     with db() as con:
         stages = con.execute("select count(*) c from price_plan_stages where start_date between ? and ?", (today.isoformat(), (today + timedelta(days=30)).isoformat())).fetchone()["c"]
         stages15 = con.execute("select count(*) c from price_plan_stages where start_date between ? and ?", (today.isoformat(), (today + timedelta(days=15)).isoformat())).fetchone()["c"]
+        recent_batches = import_history()
+    platform_distribution: dict[str, dict[str, int]] = {}
+    for item in checks_data:
+        platform = item["platform"] or "未匹配平台"
+        bucket = platform_distribution.setdefault(platform, {"below_target": 0, "missing": 0, "normal": 0, "other": 0})
+        if item["issue_type"] in {"BELOW_BASE_PRICE", "BELOW_STAGE_TARGET", "NOT_UPDATED_AFTER_EFFECTIVE_DATE"}:
+            bucket["below_target"] += 1
+        elif item["issue_type"] == "PLATFORM_PRICE_MISSING":
+            bucket["missing"] += 1
+        elif item["issue_type"] == "NORMAL":
+            bucket["normal"] += 1
+        else:
+            bucket["other"] += 1
     return {
+        "audit_date": today.isoformat(),
         "upcoming_30_days": stages,
         "upcoming_15_days": stages15,
-        "below_target_count": sum(1 for x in checks_data if x["issue_type"] in {"BELOW_BASE_PRICE", "BELOW_STAGE_TARGET"}),
+        "below_target_count": sum(1 for x in checks_data if x["issue_type"] in {"BELOW_BASE_PRICE", "BELOW_STAGE_TARGET", "NOT_UPDATED_AFTER_EFFECTIVE_DATE"}),
         "plan_missing_sku_count": len({x["sku"] for x in checks_data if x["issue_type"] == "PLAN_MISSING"}),
         "platform_price_missing_count": sum(1 for x in checks_data if x["issue_type"] == "PLATFORM_PRICE_MISSING"),
+        "recent_batches": recent_batches[:6],
+        "platform_distribution": [{"platform": k, **v} for k, v in sorted(platform_distribution.items())],
     }
 
 
 @app.get("/api/reminders")
-def reminders() -> list[dict[str, Any]]:
-    today = date.today()
-    checks_data = load_checks()
-    risk = {(x["sku"], x["current_stage"]) for x in checks_data if x["issue_type"] in {"BELOW_STAGE_TARGET", "BELOW_BASE_PRICE"}}
+def reminders(audit_date: str | None = None) -> list[dict[str, Any]]:
+    today = date.fromisoformat(audit_date) if audit_date else date.today()
+    checks_data = load_checks(audit_date=today.isoformat())
+    risk_checks = [x for x in checks_data if x["issue_type"] in {"BELOW_STAGE_TARGET", "BELOW_BASE_PRICE", "NOT_UPDATED_AFTER_EFFECTIVE_DATE"}]
+    risk = {(x["sku"], x["current_stage"]): x for x in risk_checks}
     out = []
     with db() as con:
+        statuses = {row["reminder_key"]: row["status"] for row in con.execute("select * from reminder_statuses").fetchall()}
         for row in con.execute("select * from price_plan_stages where start_date is not null order by start_date, sku").fetchall():
             start = date.fromisoformat(row["start_date"])
             days = (start - today).days
-            if days in {30, 15} or 0 <= days <= 7 or (days < 0 and (row["sku"], row["stage_name"]) in risk):
+            key = f"{row['sku']}|{row['stage_name']}|{row['start_date']}"
+            risk_item = risk.get((row["sku"], row["stage_name"]))
+            reminder_type = "HIGH_RISK" if days < 0 and risk_item else ("D30" if days <= 30 and days > 15 else "D15" if days <= 15 and days > 7 else "D7")
+            status = statuses.get(key, "未处理")
+            if days in {30, 15} or 0 <= days <= 7 or risk_item:
                 out.append(
                     {
+                        "reminder_key": key,
                         "sku": row["sku"],
+                        "platform": risk_item["platform"] if risk_item else None,
                         "stage_name": row["stage_name"],
                         "start_date": row["start_date"],
                         "end_date": row["end_date"],
                         "target_price": row["target_price"],
+                        "current_price": risk_item["current_price"] if risk_item else None,
+                        "diff": risk_item["diff"] if risk_item else None,
                         "days_until_start": days,
-                        "reminder_type": "HIGH_RISK" if days < 0 else ("D30" if days == 30 else "D15" if days == 15 else "D7"),
+                        "reminder_type": reminder_type,
+                        "severity": "HIGH" if reminder_type == "HIGH_RISK" else "MEDIUM",
+                        "status": status,
+                        "suggested_action": risk_item["suggested_action"] if risk_item else "关注阶段开始日期并提前确认平台价格",
                     }
                 )
     return out
+
+
+@app.post("/api/reminders/status")
+def update_reminder_status(reminder_key: str = Form(...), status: str = Form(...)) -> dict[str, Any]:
+    if status not in {"未处理", "处理中", "已处理", "忽略"}:
+        raise HTTPException(400, "不支持的提醒状态")
+    with db() as con:
+        con.execute(
+            """
+            insert into reminder_statuses (reminder_key, status, updated_at)
+            values (?, ?, ?)
+            on conflict(reminder_key) do update set status=excluded.status, updated_at=excluded.updated_at
+            """,
+            (reminder_key, status, datetime.now().isoformat(timespec="seconds")),
+        )
+    return {"ok": True}
+
+
+@app.get("/api/checks/export")
+def export_checks(audit_date: str | None = None, issue_type: str | None = None, sku: str | None = None, platform: str | None = None) -> FileResponse:
+    data = checks(issue_type=issue_type, sku=sku, platform=platform, audit_date=audit_date)
+    df = pd.DataFrame(data)
+    path = Path(tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx").name)
+    df.to_excel(path, index=False, engine="openpyxl")
+    return FileResponse(path, filename=f"price_checks_{audit_date or date.today().isoformat()}.xlsx")
 
 
 app.mount("/assets", StaticFiles(directory=FRONTEND_DIR), name="assets")

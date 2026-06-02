@@ -4,20 +4,32 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>涨价节奏监控系统</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;font-size:13px;color:#172033;background:#eaf0f8}
+      button,input,select{font:inherit} .shell{display:flex;height:100vh;min-height:720px;overflow:hidden}.sb{width:214px;background:#09213f;border-right:1px solid #18395f;display:flex;flex-direction:column;color:#d8e5f6}.sb-logo{padding:18px 16px 14px;border-bottom:1px solid #18395f;background:#071b35}.sb-title{font-size:15px;font-weight:650;color:#fff}.sb-sub{font-size:11px;color:#8fb2da;margin-top:3px}.sb-section{padding:14px 16px 5px;font-size:10px;font-weight:700;color:#7fa4cf;letter-spacing:.6px}.sb-item{display:flex;align-items:center;gap:9px;padding:9px 16px;cursor:pointer;color:#c4d7ee;border-left:3px solid transparent}.sb-item:hover{background:#0f2e55;color:#fff}.sb-item.on{background:#143b68;border-left-color:#7bc2ff;color:#fff;font-weight:650}.sb-footer{margin-top:auto;padding:14px 16px;border-top:1px solid #18395f;font-size:11px;color:#8fb2da}
+      .main{flex:1;overflow:auto;background:linear-gradient(180deg,#eaf0f8 0,#f6f8fb 180px)}.topbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;background:#0d2a4d;color:#fff;border-bottom:1px solid #1d4975;padding:14px 20px}.topbar-title{font-size:17px;font-weight:650}.topbar-right{display:flex;gap:8px;align-items:center}.topbar .gray{color:#c7d9ed}.content{padding:20px}.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:16px}.metric{background:#fff;border:1px solid #c9d7e8;border-radius:8px;padding:14px 16px;box-shadow:0 1px 2px rgba(9,33,63,.05)}.m-label{font-size:12px;color:#52647a;margin-bottom:8px}.m-val{font-size:28px;font-weight:650;line-height:1}.m-sub{font-size:11px;margin-top:6px;color:#667890}.red{color:#b42318}.amber{color:#925a10}.blue{color:#0c5d9f}.green{color:#2f6b1f}.gray{color:#5f6f84}
+      .g2{display:grid;grid-template-columns:1fr 1fr;gap:14px}.card{background:#fff;border:1px solid #c9d7e8;border-radius:8px;margin-bottom:14px;box-shadow:0 1px 3px rgba(9,33,63,.04)}.card-head{display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid #e1e8f2;background:#fbfdff}.card-title{font-size:14px;font-weight:650}.card-body{padding:14px 16px}.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #b9c9dc;background:#fff;border-radius:7px;padding:7px 12px;cursor:pointer;color:#172033}.btn:hover{background:#eef5fc}.btn-sm{padding:5px 9px;font-size:12px}.btn-primary{background:#0d4f86;border-color:#0d4f86;color:#fff}.btn-primary:hover{background:#0a3f6b}.btn:disabled{opacity:.45;cursor:not-allowed}.input,.select{border:1px solid #b9c9dc;border-radius:7px;background:#fff;padding:7px 10px;min-height:34px}.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:12px 16px;border-bottom:1px solid #e1e8f2}.quick{border:1px solid #c9d7e8;background:#fff;border-radius:999px;padding:5px 10px;cursor:pointer;font-size:12px}.quick.on{background:#e5f2ff;border-color:#88bde9;color:#0d4f86}
+      .tbl-wrap{overflow:auto}.tbl{width:100%;border-collapse:collapse;font-size:12px}.tbl th{position:sticky;top:0;background:#eef4fb;color:#4f6177;text-align:left;font-weight:650;padding:9px 12px;border-bottom:1px solid #c9d7e8;white-space:nowrap}.tbl td{padding:9px 12px;border-bottom:1px solid #e8eef6;white-space:nowrap}.tbl tr:hover td{background:#f3f8fd}.mono{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.badge{display:inline-flex;align-items:center;padding:2px 7px;border-radius:5px;font-size:11px;font-weight:650}.b-red{background:#fdecec;color:#b42318}.b-amber{background:#fff2d8;color:#925a10}.b-blue{background:#e5f2ff;color:#0d4f86}.b-green{background:#eaf6e4;color:#2f6b1f}.b-gray{background:#eef2f6;color:#5f6f84}.stage-pill{display:inline-flex;border:1px solid #c9d7e8;border-radius:999px;padding:2px 8px;background:#f4f8fd;color:#38506b;font-size:11px}.neg{color:#b42318;font-weight:650}.pos{color:#2f6b1f;font-weight:650}
+      .ptabs{display:flex;background:#0f3158;border-bottom:1px solid #1d4975}.ptab{padding:11px 16px;cursor:pointer;border-bottom:2px solid transparent;color:#c7d9ed}.ptab.on{border-bottom-color:#7bc2ff;color:#fff;font-weight:650}.upzone{border:1.5px dashed #8aaaca;border-radius:10px;background:#f4f8fd;padding:30px 20px;text-align:center;margin-top:14px}.col-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.col-toggle{display:flex;align-items:center;gap:7px;border:1px solid #c9d7e8;border-radius:7px;padding:8px 10px;cursor:pointer;min-width:0}.col-toggle.sel{background:#e5f2ff;border-color:#88bde9;color:#0d4f86}.truncate{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.notice{border:1px solid #bfe3ce;background:#effaf3;color:#1f6f3a;border-radius:7px;padding:10px 12px}.error{border:1px solid #f2b8b5;background:#fff1f0;color:#b42318;border-radius:7px;padding:10px 12px}.bar-row{display:grid;grid-template-columns:100px 1fr 48px;gap:10px;align-items:center;margin:9px 0}.bar-track{height:18px;background:#e9eff6;border-radius:4px;overflow:hidden;display:flex}.bar-red{background:#f09595}.bar-amber{background:#fac775}.bar-green{background:#97c459}.alert-row{display:flex;gap:10px;padding:11px 14px;border-bottom:1px solid #e8eef6}.alert-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex:none}.dot-red{background:#e24b4a}.dot-amber{background:#ef9f27}.dot-blue{background:#378add}@media(max-width:1100px){.metrics{grid-template-columns:repeat(2,1fr)}.g2{grid-template-columns:1fr}.col-grid{grid-template-columns:repeat(2,1fr)}.sb{width:190px}}
+    </style>
   </head>
-  <body class="bg-slate-50 text-slate-900">
+  <body>
     <div id="root"></div>
     <script type="text/babel">
       const { useEffect, useMemo, useState } = React;
       const API = "";
-
-      function cx(...parts) {
-        return parts.filter(Boolean).join(" ");
-      }
+      const today = () => new Date().toISOString().slice(0, 10);
+      const money = (v) => v === null || v === undefined ? "-" : Number(v).toFixed(2);
+      const uniq = (arr) => [...new Set(arr.filter((x) => x !== null && x !== undefined && x !== ""))];
+      const issueLabel = {
+        BELOW_BASE_PRICE:"低于协同价", BELOW_STAGE_TARGET:"低于阶段目标价", NOT_UPDATED_AFTER_EFFECTIVE_DATE:"到期未涨价",
+        PLATFORM_PRICE_MISSING:"平台价格缺失", PLATFORM_NOT_APPLICABLE:"平台不适用", PLAN_MISSING:"缺少涨价计划",
+        SNAPSHOT_SKU_MISSING:"价格表缺少 SKU", PRICE_PARSE_ERROR:"价格解析错误", NORMAL:"正常"
+      };
+      const sevClass = { HIGH:"b-red", MEDIUM:"b-amber", LOW:"b-gray", NORMAL:"b-green" };
 
       async function jsonFetch(url, options) {
         const res = await fetch(url, options);
@@ -26,362 +38,274 @@
       }
 
       function App() {
-        const [tab, setTab] = useState("dashboard");
-        const tabs = [
-          ["dashboard", "Dashboard"],
-          ["priceImport", "价格统计表导入"],
-          ["planImport", "涨价计划表导入"],
-          ["checks", "价格检查结果"],
-          ["reminders", "提醒中心"],
+        const [tab, setTab] = useState("dash");
+        const [refreshKey, setRefreshKey] = useState(0);
+        const nav = [
+          ["dash", "Dashboard", "总览"],
+          ["priceImport", "价格统计表", "数据导入"],
+          ["planImport", "涨价计划表", "数据导入"],
+          ["checks", "价格检查", "分析"],
+          ["alerts", "提醒中心", "分析"],
         ];
         return (
-          <div className="min-h-screen">
-            <header className="border-b bg-white">
-              <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-4">
-                <div>
-                  <h1 className="text-xl font-semibold">涨价节奏监控系统</h1>
-                  <p className="mt-1 text-sm text-slate-500">Excel 导入、阶段目标价检查、执行提醒</p>
-                </div>
-              </div>
-              <nav className="mx-auto flex max-w-7xl gap-1 px-5">
-                {tabs.map(([id, label]) => (
-                  <button
-                    key={id}
-                    onClick={() => setTab(id)}
-                    className={cx(
-                      "border-b-2 px-4 py-3 text-sm font-medium",
-                      tab === id ? "border-emerald-600 text-emerald-700" : "border-transparent text-slate-500 hover:text-slate-800"
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </nav>
-            </header>
-            <main className="mx-auto max-w-7xl px-5 py-6">
-              {tab === "dashboard" && <Dashboard />}
-              {tab === "priceImport" && <PriceImport />}
-              {tab === "planImport" && <PlanImport />}
+          <div className="shell">
+            <nav className="sb">
+              <div className="sb-logo"><div className="sb-title">价格监控</div><div className="sb-sub">Price Rhythm Monitor</div></div>
+              {["总览", "数据导入", "分析"].map((section) => (
+                <React.Fragment key={section}>
+                  <div className="sb-section">{section}</div>
+                  {nav.filter((x) => x[2] === section).map(([id, label]) => (
+                    <div key={id} className={"sb-item " + (tab === id ? "on" : "")} onClick={() => setTab(id)}>{label}</div>
+                  ))}
+                </React.Fragment>
+              ))}
+              <div className="sb-footer">当前版本：MVP 动态数据版</div>
+            </nav>
+            <main className="main">
+              {tab === "dash" && <Dashboard refreshKey={refreshKey} />}
+              {tab === "priceImport" && <PriceImport onImported={() => setRefreshKey((v) => v + 1)} />}
+              {tab === "planImport" && <PlanImport onImported={() => setRefreshKey((v) => v + 1)} />}
               {tab === "checks" && <Checks />}
-              {tab === "reminders" && <Reminders />}
+              {tab === "alerts" && <Reminders />}
             </main>
           </div>
         );
       }
 
-      function Metric({ label, value }) {
-        return (
-          <div className="rounded border bg-white p-4">
-            <div className="text-2xl font-semibold">{value ?? "-"}</div>
-            <div className="mt-1 text-sm text-slate-500">{label}</div>
-          </div>
-        );
-      }
-
-      function Dashboard() {
+      function Dashboard({ refreshKey }) {
+        const [auditDate, setAuditDate] = useState(today());
         const [data, setData] = useState(null);
-        useEffect(() => {
-          jsonFetch(`${API}/api/dashboard`).then(setData).catch(console.error);
-        }, []);
+        useEffect(() => { jsonFetch(`${API}/api/dashboard?audit_date=${auditDate}`).then(setData).catch(console.error); }, [auditDate, refreshKey]);
+        const max = Math.max(1, ...(data?.platform_distribution || []).map((x) => x.below_target + x.missing + x.normal + x.other));
         return (
-          <section>
-            <div className="grid gap-4 md:grid-cols-5">
-              <Metric label="未来 30 天阶段数" value={data?.upcoming_30_days} />
-              <Metric label="未来 15 天阶段数" value={data?.upcoming_15_days} />
-              <Metric label="低于目标价数量" value={data?.below_target_count} />
-              <Metric label="计划缺失 SKU 数" value={data?.plan_missing_sku_count} />
-              <Metric label="平台价缺失数量" value={data?.platform_price_missing_count} />
+          <>
+            <div className="topbar">
+              <span className="topbar-title">Dashboard</span>
+              <div className="topbar-right"><span className="gray">检查日期</span><input className="input" type="date" value={auditDate} onChange={(e) => setAuditDate(e.target.value)} /></div>
             </div>
-          </section>
-        );
-      }
-
-      function PriceImport() {
-        const [file, setFile] = useState(null);
-        const [snapshotDate, setSnapshotDate] = useState("");
-        const [preview, setPreview] = useState(null);
-        const [selected, setSelected] = useState([]);
-        const [message, setMessage] = useState("");
-        const [history, setHistory] = useState([]);
-
-        async function loadHistory() {
-          const data = await jsonFetch(`${API}/api/import-history?import_type=price_statistics`);
-          setHistory(data);
-        }
-
-        useEffect(() => {
-          loadHistory().catch(console.error);
-        }, []);
-
-        async function previewFile() {
-          const form = new FormData();
-          form.append("file", file);
-          if (snapshotDate) form.append("snapshot_date", snapshotDate);
-          const data = await jsonFetch(`${API}/api/price-statistics/preview`, { method: "POST", body: form });
-          setPreview(data);
-          setSnapshotDate(data.snapshot_date || snapshotDate);
-          setSelected(data.detected_platform_columns || []);
-        }
-
-        async function importFile() {
-          const form = new FormData();
-          form.append("file", file);
-          form.append("snapshot_date", snapshotDate);
-          form.append("platform_columns", selected.join(","));
-          const data = await jsonFetch(`${API}/api/price-statistics/import`, { method: "POST", body: form });
-          setMessage(`已导入 ${data.imported} 条平台价格记录`);
-          await loadHistory();
-        }
-
-        return (
-          <ImportShell
-            title="价格统计表导入"
-            file={file}
-            setFile={setFile}
-            message={message}
-            actions={
-              <>
-                <label className="text-sm">
-                  快照日期
-                  <input type="date" value={snapshotDate} onChange={(e) => setSnapshotDate(e.target.value)} className="ml-2 rounded border px-2 py-1" />
-                </label>
-                <button disabled={!file} onClick={previewFile} className="rounded bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-40">识别预览</button>
-                <button disabled={!file || !snapshotDate || selected.length === 0} onClick={importFile} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white disabled:opacity-40">确认导入</button>
-              </>
-            }
-          >
-            {preview && <ColumnSelector preview={preview} selected={selected} setSelected={setSelected} label="平台价格列" />}
-            <ImportHistory rows={history} typeLabel="价格统计表" />
-          </ImportShell>
-        );
-      }
-
-      function PlanImport() {
-        const [file, setFile] = useState(null);
-        const [planYear, setPlanYear] = useState(new Date().getFullYear());
-        const [preview, setPreview] = useState(null);
-        const [selected, setSelected] = useState([]);
-        const [message, setMessage] = useState("");
-        const [history, setHistory] = useState([]);
-
-        async function loadHistory() {
-          const data = await jsonFetch(`${API}/api/import-history?import_type=price_plan`);
-          setHistory(data);
-        }
-
-        useEffect(() => {
-          loadHistory().catch(console.error);
-        }, []);
-
-        async function previewFile() {
-          const form = new FormData();
-          form.append("file", file);
-          form.append("plan_year", planYear);
-          const data = await jsonFetch(`${API}/api/price-plan/preview`, { method: "POST", body: form });
-          setPreview(data);
-          setSelected((data.detected_stage_columns || []).map((x) => x.column));
-        }
-
-        async function importFile() {
-          const form = new FormData();
-          form.append("file", file);
-          form.append("plan_year", planYear);
-          form.append("stage_columns", selected.join(","));
-          const data = await jsonFetch(`${API}/api/price-plan/import`, { method: "POST", body: form });
-          setMessage(`已导入 ${data.imported_items} 个 SKU，${data.imported_stages} 条阶段价格`);
-          await loadHistory();
-        }
-
-        return (
-          <ImportShell
-            title="涨价计划表导入"
-            file={file}
-            setFile={setFile}
-            message={message}
-            actions={
-              <>
-                <label className="text-sm">
-                  计划年份
-                  <input type="number" value={planYear} onChange={(e) => setPlanYear(e.target.value)} className="ml-2 w-24 rounded border px-2 py-1" />
-                </label>
-                <button disabled={!file} onClick={previewFile} className="rounded bg-slate-900 px-3 py-2 text-sm text-white disabled:opacity-40">解析预览</button>
-                <button disabled={!file || selected.length === 0} onClick={importFile} className="rounded bg-emerald-700 px-3 py-2 text-sm text-white disabled:opacity-40">确认导入</button>
-              </>
-            }
-          >
-            {preview && (
-              <>
-                <ColumnSelector preview={preview} selected={selected} setSelected={setSelected} label="阶段价格列" />
-                <div className="mt-4 overflow-x-auto rounded border bg-white">
-                  <table className="min-w-full text-sm">
-                    <thead className="bg-slate-100">
-                      <tr><th className="px-3 py-2 text-left">阶段列</th><th className="px-3 py-2 text-left">开始日期</th><th className="px-3 py-2 text-left">结束日期</th></tr>
-                    </thead>
-                    <tbody>
-                      {preview.detected_stage_columns.map((x) => (
-                        <tr key={x.column} className="border-t"><td className="px-3 py-2">{x.column}</td><td className="px-3 py-2">{x.start_date || "-"}</td><td className="px-3 py-2">{x.end_date || "-"}</td></tr>
-                      ))}
-                    </tbody>
-                  </table>
+            <div className="content">
+              <div className="metrics">
+                <Metric label="30天内执行阶段" value={data?.upcoming_30_days} tone="amber" sub="按检查日期动态计算" />
+                <Metric label="15天内执行阶段" value={data?.upcoming_15_days} tone="red" sub="需要提前确认" />
+                <Metric label="低于目标价" value={data?.below_target_count} tone="red" sub="含到期未涨价" />
+                <Metric label="缺少涨价计划" value={data?.plan_missing_sku_count} tone="amber" sub="SKU 未匹配计划" />
+                <Metric label="平台价格缺失" value={data?.platform_price_missing_count} tone="gray" sub="空白或 #N/A" />
+              </div>
+              <div className="g2">
+                <div className="card">
+                  <div className="card-head"><span className="card-title">最近导入批次</span><span className="badge b-blue">{data?.recent_batches?.length || 0} 条</span></div>
+                  <Table rows={data?.recent_batches || []} columns={[["imported_at","导入时间"],["import_type","类型"],["filename","文件"],["sku_count","SKU"],["detail_count","明细"],["snapshot_date","快照日期"],["plan_year","年份"]]} empty="暂无导入批次" />
                 </div>
-              </>
-            )}
-            <ImportHistory rows={history} typeLabel="涨价计划表" />
-          </ImportShell>
-        );
-      }
-
-      function ImportShell({ title, file, setFile, actions, message, children }) {
-        return (
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3 rounded border bg-white p-4">
-              <h2 className="mr-auto text-lg font-semibold">{title}</h2>
-              <input type="file" accept=".xlsx,.xls" onChange={(e) => setFile(e.target.files[0])} className="text-sm" />
-              {actions}
+                <div className="card">
+                  <div className="card-head"><span className="card-title">平台异常分布</span><span className="gray">真实检查结果</span></div>
+                  <div className="card-body">
+                    {(data?.platform_distribution || []).map((p) => {
+                      const total = p.below_target + p.missing + p.normal + p.other;
+                      return <div className="bar-row" key={p.platform}>
+                        <div className="mono truncate" title={p.platform}>{p.platform}</div>
+                        <div className="bar-track">
+                          <div className="bar-red" style={{width:`${p.below_target / max * 100}%`}} title={`低于目标价 ${p.below_target}`}></div>
+                          <div className="bar-amber" style={{width:`${p.missing / max * 100}%`}} title={`缺失 ${p.missing}`}></div>
+                          <div className="bar-green" style={{width:`${p.normal / max * 100}%`}} title={`正常 ${p.normal}`}></div>
+                        </div>
+                        <div className="gray">{total}</div>
+                      </div>
+                    })}
+                  </div>
+                </div>
+              </div>
             </div>
-            {message && <div className="rounded border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{message}</div>}
-            {children}
-          </section>
+          </>
         );
       }
 
-      function ColumnSelector({ preview, selected, setSelected, label }) {
-        const selectedSet = useMemo(() => new Set(selected), [selected]);
-        function toggle(col) {
-          setSelected(selectedSet.has(col) ? selected.filter((x) => x !== col) : [...selected, col]);
+      function Metric({ label, value, tone, sub }) {
+        return <div className="metric"><div className="m-label">{label}</div><div className={"m-val " + tone}>{value ?? "-"}</div><div className="m-sub">{sub}</div></div>;
+      }
+
+      function PriceImport({ onImported }) {
+        const [step, setStep] = useState(1), [file, setFile] = useState(null), [snapshotDate, setSnapshotDate] = useState("");
+        const [preview, setPreview] = useState(null), [selected, setSelected] = useState([]), [history, setHistory] = useState([]), [message, setMessage] = useState(""), [error, setError] = useState("");
+        const loadHistory = () => jsonFetch(`${API}/api/import-history?import_type=price_statistics`).then(setHistory);
+        useEffect(() => { loadHistory().catch(console.error); }, []);
+        async function previewFile() {
+          setError(""); setMessage("");
+          try {
+            const form = new FormData(); form.append("file", file); if (snapshotDate) form.append("snapshot_date", snapshotDate);
+            const data = await jsonFetch(`${API}/api/price-statistics/preview`, { method:"POST", body:form });
+            if (!data.detected_platform_columns?.length) throw new Error("未识别到平台价格列，请检查表头或手动勾选列。");
+            setPreview(data); setSnapshotDate(data.snapshot_date || snapshotDate); setSelected(data.detected_platform_columns || []); setStep(2);
+          } catch (e) { setError(readableError(e)); }
         }
-        return (
-          <div className="rounded border bg-white p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="font-medium">{label}</div>
-              <div className="text-sm text-slate-500">表头行：第 {preview.header_row} 行，已选 {selected.length} 列</div>
-            </div>
-            <div className="grid gap-2 md:grid-cols-4">
-              {preview.columns.map((col) => (
-                <label key={col} className={cx("flex items-center gap-2 rounded border px-3 py-2 text-sm", selectedSet.has(col) && "border-emerald-500 bg-emerald-50")}>
-                  <input type="checkbox" checked={selectedSet.has(col)} onChange={() => toggle(col)} />
-                  <span className="truncate">{col}</span>
-                </label>
-              ))}
-            </div>
-            <PreviewTable rows={preview.preview_rows} />
-          </div>
-        );
+        async function importFile() {
+          setError("");
+          try {
+            const form = new FormData(); form.append("file", file); form.append("snapshot_date", snapshotDate); form.append("platform_columns", selected.join(","));
+            const data = await jsonFetch(`${API}/api/price-statistics/import`, { method:"POST", body:form });
+            setMessage(`已生成批次 #${data.batch_id}，导入 ${data.imported} 条平台价格记录。`); await loadHistory(); onImported?.(); setStep(3);
+          } catch (e) { setError(readableError(e)); }
+        }
+        const longPreview = useMemo(() => makePriceLongPreview(preview, selected, snapshotDate), [preview, selected, snapshotDate]);
+        return <ImportLayout title="导入价格统计表" step={step} setStep={setStep} error={error} message={message}>
+          {step === 1 && <UploadCard file={file} setFile={setFile} primaryLabel="识别表头和平台列" onPrimary={previewFile} disabled={!file} extra={<label>价格快照日期 <input className="input" type="date" value={snapshotDate} onChange={(e) => setSnapshotDate(e.target.value)} /></label>} />}
+          {step === 2 && preview && <ColumnConfirm preview={preview} selected={selected} setSelected={setSelected} title="确认平台价格列" onBack={() => setStep(1)} onNext={() => setStep(3)} />}
+          {step === 3 && preview && <PreviewAndImport rows={longPreview} columns={[["sku","SKU"],["category_1","一级类目"],["category_2","二级类目"],["platform","平台"],["current_price","当前价"],["raw_value","原始值"],["snapshot_date","快照日期"],["price_status","解析状态"]]} onBack={() => setStep(2)} onImport={importFile} canImport={!!snapshotDate && selected.length > 0} />}
+          <ImportHistory rows={history} title="价格统计表导入历史" />
+        </ImportLayout>;
       }
 
-      function ImportHistory({ rows, typeLabel }) {
-        return (
-          <div className="rounded border bg-white p-4">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="font-medium">{typeLabel}导入历史</div>
-              <div className="text-sm text-slate-500">最近 {rows.length} 次导入</div>
-            </div>
-            <div className="overflow-auto rounded border">
-              <table className="min-w-full text-sm">
-                <thead className="bg-slate-100">
-                  <tr>
-                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">导入时间</th>
-                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">文件名</th>
-                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">SKU 数</th>
-                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">明细数</th>
-                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">快照/年份</th>
-                    <th className="whitespace-nowrap px-3 py-2 text-left font-medium">已确认列</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row) => (
-                    <tr key={row.id} className="border-t hover:bg-slate-50">
-                      <td className="whitespace-nowrap px-3 py-2">{row.imported_at}</td>
-                      <td className="whitespace-nowrap px-3 py-2">{row.filename || "-"}</td>
-                      <td className="whitespace-nowrap px-3 py-2">{row.sku_count}</td>
-                      <td className="whitespace-nowrap px-3 py-2">{row.detail_count}</td>
-                      <td className="whitespace-nowrap px-3 py-2">{row.snapshot_date || row.plan_year || "-"}</td>
-                      <td className="max-w-xl truncate px-3 py-2" title={row.selected_columns || ""}>{row.selected_columns || "-"}</td>
-                    </tr>
-                  ))}
-                  {rows.length === 0 && <tr><td colSpan="6" className="px-3 py-8 text-center text-slate-500">暂无导入历史</td></tr>}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
+      function PlanImport({ onImported }) {
+        const [step, setStep] = useState(1), [file, setFile] = useState(null), [planYear, setPlanYear] = useState(new Date().getFullYear());
+        const [preview, setPreview] = useState(null), [selected, setSelected] = useState([]), [history, setHistory] = useState([]), [message, setMessage] = useState(""), [error, setError] = useState("");
+        const loadHistory = () => jsonFetch(`${API}/api/import-history?import_type=price_plan`).then(setHistory);
+        useEffect(() => { loadHistory().catch(console.error); }, []);
+        async function previewFile() {
+          setError(""); setMessage("");
+          try {
+            const form = new FormData(); form.append("file", file); form.append("plan_year", planYear);
+            const data = await jsonFetch(`${API}/api/price-plan/preview`, { method:"POST", body:form });
+            if (!data.detected_stage_columns?.length) throw new Error("未识别到阶段价格列，请检查 Red White Blue、8.06-10.04、10.05后价格等列名。");
+            setPreview(data); setSelected(data.detected_stage_columns.map((x) => x.column)); setStep(2);
+          } catch (e) { setError(readableError(e)); }
+        }
+        async function importFile() {
+          setError("");
+          try {
+            const form = new FormData(); form.append("file", file); form.append("plan_year", planYear); form.append("stage_columns", selected.join(","));
+            const data = await jsonFetch(`${API}/api/price-plan/import`, { method:"POST", body:form });
+            setMessage(`已生成批次 #${data.batch_id}，导入 ${data.imported_items} 个 SKU、${data.imported_stages} 条阶段价格。`); await loadHistory(); onImported?.(); setStep(3);
+          } catch (e) { setError(readableError(e)); }
+        }
+        const rows = useMemo(() => makePlanStagePreview(preview, selected), [preview, selected]);
+        return <ImportLayout title="导入涨价计划表" step={step} setStep={setStep} error={error} message={message}>
+          {step === 1 && <UploadCard file={file} setFile={setFile} primaryLabel="识别阶段列" onPrimary={previewFile} disabled={!file} extra={<label>计划年份 <input className="input" type="number" value={planYear} onChange={(e) => setPlanYear(e.target.value)} /></label>} />}
+          {step === 2 && preview && <StageConfirm preview={preview} selected={selected} setSelected={setSelected} onBack={() => setStep(1)} onNext={() => setStep(3)} />}
+          {step === 3 && preview && <PreviewAndImport rows={rows} columns={[["sku","SKU"],["category_1","一级类目"],["category_2","二级类目"],["base_price","协同价"],["stage_name","阶段名称"],["start_date","开始日期"],["end_date","结束日期"],["target_price","目标价"],["final_execution","最终执行时间"]]} onBack={() => setStep(2)} onImport={importFile} canImport={selected.length > 0} />}
+          <ImportHistory rows={history} title="涨价计划表导入历史" />
+        </ImportLayout>;
       }
 
-      function PreviewTable({ rows }) {
-        const cols = rows?.[0] ? Object.keys(rows[0]) : [];
-        return (
-          <div className="mt-4 max-h-80 overflow-auto rounded border">
-            <table className="min-w-full text-xs">
-              <thead className="sticky top-0 bg-slate-100">
-                <tr>{cols.map((c) => <th key={c} className="whitespace-nowrap px-2 py-2 text-left font-medium">{c}</th>)}</tr>
-              </thead>
-              <tbody>
-                {rows.map((r, i) => <tr key={i} className="border-t">{cols.map((c) => <td key={c} className="whitespace-nowrap px-2 py-1">{String(r[c] ?? "")}</td>)}</tr>)}
-              </tbody>
-            </table>
-          </div>
-        );
+      function ImportLayout({ title, step, setStep, error, message, children }) {
+        return <><div className="topbar"><span className="topbar-title">{title}</span></div><div className="ptabs">{["上传文件","确认字段","预览导入"].map((x,i)=><div key={x} className={"ptab "+(step===i+1?"on":"")} onClick={()=>setStep(i+1)}>{"①②③"[i]} {x}</div>)}</div><div className="content">{error && <div className="error">{error}</div>}{message && <div className="notice">{message}</div>}{children}</div></>;
+      }
+
+      function UploadCard({ file, setFile, primaryLabel, onPrimary, disabled, extra }) {
+        return <div className="card"><div className="card-head"><span className="card-title">上传设置</span>{extra}</div><div className="card-body"><div className="upzone"><div style={{fontSize:32}}>⇧</div><div style={{fontSize:15,fontWeight:650,marginBottom:8}}>选择 Excel 文件</div><input type="file" accept=".xlsx,.xls" onChange={(e)=>setFile(e.target.files[0])} /><div className="gray" style={{marginTop:10}}>{file ? file.name : "支持 .xlsx / .xls 横向宽表"}</div><button className="btn btn-primary" style={{marginTop:14}} disabled={disabled} onClick={onPrimary}>{primaryLabel}</button></div></div></div>;
+      }
+
+      function ColumnConfirm({ preview, selected, setSelected, title, onBack, onNext }) {
+        const set = new Set(selected);
+        const toggle = (col) => setSelected(set.has(col) ? selected.filter((x)=>x!==col) : [...selected, col]);
+        return <div className="card"><div className="card-head"><span className="card-title">{title}</span><span className="badge b-blue">表头第 {preview.header_row} 行，已选 {selected.length} 列</span></div><div className="card-body"><div className="col-grid">{preview.columns.map((col)=><label className={"col-toggle "+(set.has(col)?"sel":"")} key={col}><input type="checkbox" checked={set.has(col)} onChange={()=>toggle(col)} /><span className="truncate" title={col}>{col}</span></label>)}</div><div style={{marginTop:14,display:"flex",gap:8}}><button className="btn btn-primary" disabled={!selected.length} onClick={onNext}>确认并预览</button><button className="btn" onClick={onBack}>返回</button></div></div></div>;
+      }
+
+      function StageConfirm({ preview, selected, setSelected, onBack, onNext }) {
+        const stages = preview.detected_stage_columns || [];
+        const stageMap = Object.fromEntries(stages.map((x)=>[x.column,x]));
+        const fakePreview = { ...preview, columns: preview.columns };
+        return <><ColumnConfirm preview={fakePreview} selected={selected} setSelected={setSelected} title="确认阶段价格列" onBack={onBack} onNext={onNext} /><div className="card"><div className="card-head"><span className="card-title">阶段解析结果</span></div><Table rows={selected.map((col)=>({ column:col, start_date:stageMap[col]?.start_date, end_date:stageMap[col]?.end_date || "自动推算/空" }))} columns={[["column","阶段列"],["start_date","开始日期"],["end_date","结束日期"]]} /></div></>;
+      }
+
+      function PreviewAndImport({ rows, columns, onBack, onImport, canImport }) {
+        return <div className="card"><div className="card-head"><span className="card-title">导入预览</span><span className="badge b-blue">{rows.length} 条预览记录</span></div><Table rows={rows} columns={columns} /><div className="card-body" style={{display:"flex",gap:8}}><button className="btn btn-primary" disabled={!canImport} onClick={onImport}>确认导入并生成批次</button><button className="btn" onClick={onBack}>返回</button></div></div>;
+      }
+
+      function ImportHistory({ rows, title }) {
+        return <div className="card"><div className="card-head"><span className="card-title">{title}</span><span className="gray">最近 {rows.length} 次</span></div><Table rows={rows} columns={[["id","批次"],["imported_at","导入时间"],["filename","文件名"],["sku_count","SKU数"],["detail_count","明细数"],["snapshot_date","快照"],["plan_year","年份"],["selected_columns","确认列"]]} empty="暂无导入历史" /></div>;
       }
 
       function Checks() {
-        const [rows, setRows] = useState([]);
-        const [filters, setFilters] = useState({ sku: "", platform: "", issue: "" });
-        useEffect(() => { jsonFetch(`${API}/api/checks`).then(setRows).catch(console.error); }, []);
-        const data = rows.filter((r) =>
-          (!filters.sku || r.sku?.toLowerCase().includes(filters.sku.toLowerCase())) &&
-          (!filters.platform || r.platform === filters.platform) &&
-          (!filters.issue || r.issue_type === filters.issue)
-        );
-        const platforms = [...new Set(rows.map((r) => r.platform))];
-        const issues = [...new Set(rows.map((r) => r.issue_type))];
-        return (
-          <section className="space-y-4">
-            <div className="flex flex-wrap gap-3 rounded border bg-white p-4">
-              <input placeholder="SKU" value={filters.sku} onChange={(e) => setFilters({ ...filters, sku: e.target.value })} className="rounded border px-3 py-2 text-sm" />
-              <select value={filters.platform} onChange={(e) => setFilters({ ...filters, platform: e.target.value })} className="rounded border px-3 py-2 text-sm">
-                <option value="">全部平台</option>{platforms.map((p) => <option key={p}>{p}</option>)}
-              </select>
-              <select value={filters.issue} onChange={(e) => setFilters({ ...filters, issue: e.target.value })} className="rounded border px-3 py-2 text-sm">
-                <option value="">全部异常类型</option>{issues.map((p) => <option key={p}>{p}</option>)}
-              </select>
-            </div>
-            <DataTable rows={data} columns={[
-              ["sku", "SKU"], ["category_1", "一级类目"], ["category_2", "二级类目"], ["platform", "平台"],
-              ["current_price", "当前价"], ["target_price", "目标价"], ["diff", "差额"], ["current_stage", "当前阶段"],
-              ["issue_type", "问题类型"], ["severity", "严重程度"], ["suggested_action", "建议动作"]
-            ]} />
-          </section>
-        );
+        const [auditDate,setAuditDate] = useState(today()), [rows,setRows] = useState([]), [batches,setBatches] = useState([]);
+        const [f,setF] = useState({ sku:"", c1:"", c2:"", platform:"", stage:"", issue:"", severity:"", quick:"" });
+        useEffect(()=>{ load(); jsonFetch(`${API}/api/import-history`).then(setBatches).catch(console.error); }, [auditDate]);
+        async function load(){ setRows(await jsonFetch(`${API}/api/checks?audit_date=${auditDate}`)); }
+        const filtered = rows.filter((r)=> matchFilters(r,f));
+        const opts = {
+          c1: uniq(rows.map(r=>r.category_1)), c2: uniq(rows.map(r=>r.category_2)), platform: uniq(rows.map(r=>r.platform)),
+          stage: uniq(rows.map(r=>r.current_stage)), issue: uniq(rows.map(r=>r.issue_type)), severity: uniq(rows.map(r=>r.severity))
+        };
+        function exportUrl(){ const p = new URLSearchParams({ audit_date:auditDate }); if(f.issue) p.set("issue_type", f.issue); if(f.sku) p.set("sku", f.sku); if(f.platform) p.set("platform", f.platform); return `${API}/api/checks/export?${p.toString()}`; }
+        return <><div className="topbar"><span className="topbar-title">价格检查结果</span><div className="topbar-right"><input className="input" type="date" value={auditDate} onChange={(e)=>setAuditDate(e.target.value)} /><a className="btn btn-sm" href={exportUrl()}>导出 Excel</a></div></div><div className="content"><div className="card"><div className="filters">
+          <input className="input" placeholder="SKU" value={f.sku} onChange={(e)=>setF({...f,sku:e.target.value})} />
+          <Select value={f.c1} onChange={(v)=>setF({...f,c1:v})} label="全部一级类目" values={opts.c1} />
+          <Select value={f.c2} onChange={(v)=>setF({...f,c2:v})} label="全部二级类目" values={opts.c2} />
+          <Select value={f.platform} onChange={(v)=>setF({...f,platform:v})} label="全部平台" values={opts.platform} />
+          <Select value={f.stage} onChange={(v)=>setF({...f,stage:v})} label="全部阶段" values={opts.stage} />
+          <Select value={f.issue} onChange={(v)=>setF({...f,issue:v})} label="全部异常类型" values={opts.issue} labels={issueLabel} />
+          <Select value={f.severity} onChange={(v)=>setF({...f,severity:v})} label="全部严重程度" values={opts.severity} />
+          <button className="btn btn-sm" onClick={()=>setF({sku:"",c1:"",c2:"",platform:"",stage:"",issue:"",severity:"",quick:""})}>重置</button>
+          <span className="gray" style={{marginLeft:"auto"}}>共 {filtered.length} / {rows.length} 条</span>
+        </div><div className="filters">
+          {[["abnormal","只看异常"],["below","只看低于目标价"],["missing","只看平台价格缺失"],["plan","只看缺少涨价计划"],["high","只看高风险"]].map(([id,label])=><button key={id} className={"quick "+(f.quick===id?"on":"")} onClick={()=>setF({...f,quick:f.quick===id?"":id})}>{label}</button>)}
+        </div><CheckTable rows={filtered} /></div></div></>;
       }
 
       function Reminders() {
-        const [rows, setRows] = useState([]);
-        useEffect(() => { jsonFetch(`${API}/api/reminders`).then(setRows).catch(console.error); }, []);
-        return <DataTable rows={rows} columns={[
-          ["sku", "SKU"], ["stage_name", "阶段"], ["start_date", "开始日期"], ["end_date", "结束日期"],
-          ["target_price", "目标价"], ["days_until_start", "距离天数"], ["reminder_type", "提醒类型"]
-        ]} />;
+        const [auditDate,setAuditDate] = useState(today()), [rows,setRows] = useState([]);
+        const load = () => jsonFetch(`${API}/api/reminders?audit_date=${auditDate}`).then(setRows);
+        useEffect(()=>{ load().catch(console.error); }, [auditDate]);
+        async function updateStatus(key,status){ const form = new FormData(); form.append("reminder_key", key); form.append("status", status); await jsonFetch(`${API}/api/reminders/status`, {method:"POST", body:form}); await load(); }
+        const groups = [["HIGH_RISK","高风险：已到执行时间但价格仍低于目标价"],["D7","7天内即将执行"],["D15","15天内即将执行"],["D30","30天内即将执行"]];
+        return <><div className="topbar"><span className="topbar-title">提醒中心</span><div className="topbar-right"><input className="input" type="date" value={auditDate} onChange={(e)=>setAuditDate(e.target.value)} /></div></div><div className="content">{groups.map(([type,title])=><ReminderGroup key={type} title={title} rows={rows.filter(r=>r.reminder_type===type && !(type==="HIGH_RISK" && r.status==="已处理"))} onStatus={updateStatus} />)}</div></>;
       }
 
-      function DataTable({ rows, columns }) {
-        return (
-          <div className="overflow-auto rounded border bg-white">
-            <table className="min-w-full text-sm">
-              <thead className="bg-slate-100">
-                <tr>{columns.map(([key, label]) => <th key={key} className="whitespace-nowrap px-3 py-2 text-left font-medium">{label}</th>)}</tr>
-              </thead>
-              <tbody>
-                {rows.map((row, idx) => (
-                  <tr key={idx} className="border-t hover:bg-slate-50">
-                    {columns.map(([key]) => <td key={key} className="whitespace-nowrap px-3 py-2">{row[key] ?? "-"}</td>)}
-                  </tr>
-                ))}
-                {rows.length === 0 && <tr><td colSpan={columns.length} className="px-3 py-8 text-center text-slate-500">暂无数据</td></tr>}
-              </tbody>
-            </table>
-          </div>
-        );
+      function ReminderGroup({ title, rows, onStatus }) {
+        return <div className="card"><div className="card-head"><span className="card-title">{title}</span><span className="badge b-blue">{rows.length} 条</span></div>{rows.length ? rows.map((r)=><div className="alert-row" key={r.reminder_key}><div className={"alert-dot "+(r.reminder_type==="HIGH_RISK"?"dot-red":r.reminder_type==="D7"?"dot-amber":"dot-blue")}></div><div style={{flex:1}}><div><strong className="mono">{r.sku}</strong> <span className="stage-pill">{r.stage_name}</span> {r.platform && <span className="gray"> · {r.platform}</span>}</div><div className="gray" style={{marginTop:4}}>目标 {money(r.target_price)} · 当前 {money(r.current_price)} · 差额 {money(r.diff)} · 开始 {r.start_date} · {r.days_until_start} 天</div><div className="gray" style={{marginTop:3}}>{r.suggested_action}</div></div><select className="select" value={r.status} onChange={(e)=>onStatus(r.reminder_key,e.target.value)}><option>未处理</option><option>处理中</option><option>已处理</option><option>忽略</option></select></div>) : <div className="card-body gray">暂无提醒</div>}</div>;
       }
+
+      function CheckTable({ rows }) {
+        const columns = [["sku","SKU"],["category_1","一级类目"],["category_2","二级类目"],["platform","平台"],["current_price","当前价"],["target_price","目标价"],["diff","差额"],["current_stage","当前阶段"],["issue_type","问题类型"],["severity","严重程度"],["suggested_action","建议动作"]];
+        return <div className="tbl-wrap"><table className="tbl"><thead><tr>{columns.map(([_,label])=><th key={label}>{label}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{columns.map(([key])=><td key={key}>{renderCell(key,r)}</td>)}</tr>)}{!rows.length && <tr><td colSpan={columns.length} style={{textAlign:"center",padding:28}} className="gray">暂无数据</td></tr>}</tbody></table></div>;
+      }
+
+      function Table({ rows, columns, empty="暂无数据" }) {
+        return <div className="tbl-wrap"><table className="tbl"><thead><tr>{columns.map(([_,label])=><th key={label}>{label}</th>)}</tr></thead><tbody>{rows.map((r,i)=><tr key={i}>{columns.map(([key])=><td key={key} className={key==="sku"?"mono":""}>{r[key] ?? "-"}</td>)}</tr>)}{!rows.length && <tr><td colSpan={columns.length} style={{textAlign:"center",padding:24}} className="gray">{empty}</td></tr>}</tbody></table></div>;
+      }
+
+      function Select({ value, onChange, label, values, labels={} }) {
+        return <select className="select" value={value} onChange={(e)=>onChange(e.target.value)}><option value="">{label}</option>{values.map(v=><option key={v} value={v}>{labels[v] || v}</option>)}</select>;
+      }
+
+      function renderCell(key, r) {
+        if (key === "issue_type") return <span className={"badge "+(r.issue_type==="NORMAL"?"b-green":r.severity==="HIGH"?"b-red":r.severity==="MEDIUM"?"b-amber":"b-gray")}>{issueLabel[r.issue_type] || r.issue_type}</span>;
+        if (key === "severity") return <span className={"badge "+(sevClass[r.severity] || "b-gray")}>{r.severity}</span>;
+        if (key === "current_stage") return <span className="stage-pill">{r.current_stage || "-"}</span>;
+        if (["current_price","target_price"].includes(key)) return money(r[key]);
+        if (key === "diff") return r.diff == null ? "-" : <span className={r.diff < 0 ? "neg" : "pos"}>{money(r.diff)}</span>;
+        return r[key] ?? "-";
+      }
+
+      function matchFilters(r, f) {
+        if (f.sku && !String(r.sku || "").toLowerCase().includes(f.sku.toLowerCase())) return false;
+        if (f.c1 && r.category_1 !== f.c1) return false; if (f.c2 && r.category_2 !== f.c2) return false; if (f.platform && r.platform !== f.platform) return false;
+        if (f.stage && r.current_stage !== f.stage) return false; if (f.issue && r.issue_type !== f.issue) return false; if (f.severity && r.severity !== f.severity) return false;
+        if (f.quick === "abnormal" && r.issue_type === "NORMAL") return false;
+        if (f.quick === "below" && !["BELOW_BASE_PRICE","BELOW_STAGE_TARGET","NOT_UPDATED_AFTER_EFFECTIVE_DATE"].includes(r.issue_type)) return false;
+        if (f.quick === "missing" && r.issue_type !== "PLATFORM_PRICE_MISSING") return false;
+        if (f.quick === "plan" && r.issue_type !== "PLAN_MISSING") return false;
+        if (f.quick === "high" && r.severity !== "HIGH") return false;
+        return true;
+      }
+
+      function findCol(columns, names) {
+        return columns.find(c => names.includes(String(c).replace(/\s/g,"").toLowerCase()));
+      }
+      function makePriceLongPreview(preview, selected, snapshotDate) {
+        if (!preview) return [];
+        const cols = preview.columns || [], sku = findCol(cols, ["sku","skuid","商品编码","产品编码","sku编码"]);
+        const c1 = findCol(cols, ["一级类目","一级分类","category_1","category1"]), c2 = findCol(cols, ["二级类目","二级分类","category_2","category2"]);
+        return (preview.preview_rows || []).slice(0,8).flatMap(row => selected.map(platform => ({ sku: row[sku], category_1: row[c1], category_2: row[c2], platform, current_price: row[platform], raw_value: row[platform], snapshot_date: snapshotDate, price_status: statusFor(row[platform]) }))).slice(0,40);
+      }
+      function makePlanStagePreview(preview, selected) {
+        if (!preview) return [];
+        const cols = preview.columns || [], sku = findCol(cols, ["sku","skuid","商品编码","产品编码","sku编码"]);
+        const c1 = findCol(cols, ["一级类目","一级分类","category_1","category1"]), c2 = findCol(cols, ["二级类目","二级分类","category_2","category2"]);
+        const base = findCol(cols, ["协同价","协同价（旧）","协同价(旧)"]), final = findCol(cols, ["最终执行时间","执行时间","effective_date"]);
+        const stages = Object.fromEntries((preview.detected_stage_columns || []).map(x=>[x.column,x]));
+        return (preview.preview_rows || []).slice(0,8).flatMap(row => selected.map(col => ({ sku: row[sku], category_1: row[c1], category_2: row[c2], base_price: row[base], stage_name: col, start_date: stages[col]?.start_date, end_date: stages[col]?.end_date || "-", target_price: row[col], final_execution: row[final] || "-" }))).slice(0,40);
+      }
+      function statusFor(v) { if (v === null || v === undefined || String(v).trim()==="" || String(v).toUpperCase()==="#N/A") return "MISSING"; if (String(v).trim()==="/") return "NOT_APPLICABLE"; return /-?\d/.test(String(v)) ? "OK" : "PARSE_ERROR"; }
+      function readableError(e) { try { const parsed = JSON.parse(e.message); return parsed.detail || e.message; } catch { return e.message || String(e); } }
 
       ReactDOM.createRoot(document.getElementById("root")).render(<App />);
     </script>

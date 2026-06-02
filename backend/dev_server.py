@@ -33,7 +33,9 @@ class _UploadFile:
         self.file = file
 
 class _NoopInit:
-    def __init__(self, *args, **kwargs): pass
+    def __init__(self, *args, **kwargs):
+        self.path = args[0] if args else kwargs.get("path")
+        self.filename = kwargs.get("filename")
 
 
 sys.modules.setdefault("fastapi", type(sys)("fastapi"))
@@ -53,6 +55,7 @@ sys.modules["fastapi.staticfiles"].StaticFiles = _NoopInit
 from backend.app.main import (  # noqa: E402
     checks,
     dashboard,
+    export_checks,
     import_price_plan,
     import_price_statistics,
     import_history,
@@ -60,6 +63,7 @@ from backend.app.main import (  # noqa: E402
     preview_price_statistics,
     reminders,
     startup,
+    update_reminder_status,
 )
 
 
@@ -100,12 +104,19 @@ class Handler(BaseHTTPRequestHandler):
         parsed = urlparse(self.path)
         try:
             if parsed.path == "/api/dashboard":
-                return self.send_json(dashboard())
+                params = parse_qs(parsed.query)
+                return self.send_json(dashboard(params.get("audit_date", [None])[0]))
             if parsed.path == "/api/checks":
                 params = parse_qs(parsed.query)
-                return self.send_json(checks(params.get("issue_type", [None])[0], params.get("sku", [None])[0], params.get("platform", [None])[0]))
+                return self.send_json(checks(params.get("issue_type", [None])[0], params.get("sku", [None])[0], params.get("platform", [None])[0], params.get("audit_date", [None])[0]))
+            if parsed.path == "/api/checks/export":
+                params = parse_qs(parsed.query)
+                response = export_checks(params.get("audit_date", [None])[0], params.get("issue_type", [None])[0], params.get("sku", [None])[0], params.get("platform", [None])[0])
+                path = Path(response.path)
+                return self.send_file(path, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
             if parsed.path == "/api/reminders":
-                return self.send_json(reminders())
+                params = parse_qs(parsed.query)
+                return self.send_json(reminders(params.get("audit_date", [None])[0]))
             if parsed.path == "/api/import-history":
                 params = parse_qs(parsed.query)
                 return self.send_json(import_history(params.get("import_type", [None])[0]))
@@ -130,6 +141,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(preview_price_plan(form_upload(form), int(form_value(form, "plan_year"))))
             if parsed.path == "/api/price-plan/import":
                 return self.send_json(import_price_plan(form_upload(form), int(form_value(form, "plan_year")), form_value(form, "stage_columns", "")))
+            if parsed.path == "/api/reminders/status":
+                return self.send_json(update_reminder_status(form_value(form, "reminder_key"), form_value(form, "status")))
             self.send_json({"detail": "Not found"}, 404)
         except _HTTPException as exc:
             self.send_json({"detail": exc.detail}, exc.status_code)
